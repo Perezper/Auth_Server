@@ -1,0 +1,299 @@
+openapi: 3.0.3
+info:
+  title: AuthServer API
+  version: 1.0.0
+  description: Especificación OpenAPI para AuthServer (endpoints de autenticación y OAuth2/introspección).
+servers:
+  - url: http://localhost:8080
+paths:
+  /auth/register:
+    post:
+      summary: Registrar un nuevo usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandardRequestRegister'
+      responses:
+        '200':
+          description: Usuario registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseRegisterResult'
+
+  /auth/login:
+    post:
+      summary: Autenticar usuario y obtener tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandardRequestAuth'
+      responses:
+        '200':
+          description: Tokens de autenticación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseAuth'
+
+  /auth/refresh:
+    post:
+      summary: Refrescar access token usando refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandardRequestMapString'
+      responses:
+        '200':
+          description: Nuevos tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseAuth'
+
+  /auth/logout:
+    post:
+      summary: Cerrar sesión (revocar refresh token)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandardRequestMapString'
+      responses:
+        '200':
+          description: Logout exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseEmpty'
+
+  /auth/userinfo:
+    get:
+      summary: Obtener información del usuario autenticado
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Información del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseUserInfo'
+        '401':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseError'
+
+  /oauth2/introspect:
+    post:
+      summary: Introspección de token (access o refresh)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandardRequestIntrospect'
+      responses:
+        '200':
+          description: Resultado de introspección
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseIntrospect'
+        '400':
+          description: Petición inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # DTOs
+    AuthRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required: [username, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        email:
+          type: string
+      required: [username, password, email]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+    IntrospectRequest:
+      type: object
+      properties:
+        token:
+          type: string
+      required: [token]
+
+    IntrospectResponse:
+      type: object
+      properties:
+        active:
+          type: boolean
+        tokenType:
+          type: string
+        expired:
+          type: boolean
+        revoked:
+          type: boolean
+        username:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        exp:
+          type: string
+          format: date-time
+
+    # StandardRequest wrappers
+    StandardRequestAuth:
+      type: object
+      properties:
+        payload:
+          $ref: '#/components/schemas/AuthRequest'
+      required: [payload]
+
+    StandardRequestRegister:
+      type: object
+      properties:
+        payload:
+          $ref: '#/components/schemas/RegisterRequest'
+      required: [payload]
+
+    StandardRequestIntrospect:
+      type: object
+      properties:
+        payload:
+          $ref: '#/components/schemas/IntrospectRequest'
+      required: [payload]
+
+    StandardRequestMapString:
+      type: object
+      properties:
+        payload:
+          type: object
+          additionalProperties:
+            type: string
+      required: [payload]
+
+    # StandardResponse variants
+    StandardResponseAuth:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AuthResponse'
+        error:
+          $ref: '#/components/schemas/ErrorResponse'
+
+    StandardResponseRegisterResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+        error:
+          $ref: '#/components/schemas/ErrorResponse'
+
+    StandardResponseUserInfo:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            username:
+              type: string
+            email:
+              type: string
+            roles:
+              type: array
+              items:
+                type: string
+        error:
+          $ref: '#/components/schemas/ErrorResponse'
+
+    StandardResponseIntrospect:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/IntrospectResponse'
+        error:
+          $ref: '#/components/schemas/ErrorResponse'
+
+    StandardResponseEmpty:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          nullable: true
+        error:
+          $ref: '#/components/schemas/ErrorResponse'
+
+    StandardResponseError:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          nullable: true
+        error:
+          $ref: '#/components/schemas/ErrorResponse'
